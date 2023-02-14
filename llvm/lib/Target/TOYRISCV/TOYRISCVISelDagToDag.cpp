@@ -9,9 +9,14 @@ TOYRISCVDAGToDAGISel::TOYRISCVDAGToDAGISel(TOYRISCVTargetMachine &TM,
 StringRef TOYRISCVDAGToDAGISel::getPassName() const {
   return "TOYRISCV DAG->DAG Pattern Instruction Selection";
 }
+bool TOYRISCVDAGToDAGISel::runOnMachineFunction(MachineFunction &MF) {
+  Subtarget = &MF.getSubtarget<TOYRISCVSubtarget>();
+  return SelectionDAGISel::runOnMachineFunction(MF);
+}
 
 void TOYRISCVDAGToDAGISel::Select(SDNode *N) {
   if (N->isMachineOpcode()) {
+    LLVM_DEBUG(dbgs() << "== "; N->dump(CurDAG); dbgs() << "\n");
     N->setNodeId(-1);
     return;
   }

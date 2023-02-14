@@ -17,6 +17,7 @@ public:
   TOYRISCVDAGToDAGISel(TOYRISCVTargetMachine &TM, CodeGenOpt::Level OL);
   StringRef getPassName() const override;
   void Select(SDNode *N) override;
+  bool runOnMachineFunction(MachineFunction &MF) override;
 };
 
 } // namespace llvm
