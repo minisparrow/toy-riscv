@@ -12,6 +12,20 @@ TOYRISCVAsmPrinter::TOYRISCVAsmPrinter(TargetMachine &TM,
 StringRef TOYRISCVAsmPrinter::getPassName() const {
   return "TOYRISCV Assembly Printer";
 }
+
+
+#include "RISCVGenMCPseudoLowering.inc"
+void TOYRISCVAsmPrinter::emitInstruction(const MachineInstr *MI) {
+  // Do any auto-generated pseudo lowerings.
+  if (emitPseudoExpansionLowering(*OutStreamer, MI))
+      return;
+
+  MCInst TmpInst;
+  LowerTOYRISCVMachineInstrToMCInst(MI, TmpInst);
+  EmitToStreamer(*OutStreamer, TmpInst);
+}
+
+
 extern "C" void LLVMInitializeTOYRISCVAsmPrinter() {
   RegisterAsmPrinter<TOYRISCVAsmPrinter> X(getTheTOYRISCV32Target());
   RegisterAsmPrinter<TOYRISCVAsmPrinter> Y(getTheTOYRISCV64Target());

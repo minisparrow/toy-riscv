@@ -7,6 +7,10 @@
 namespace llvm {
 
 class TOYRISCVTargetMachine;
+class MCInst; 
+class MachineInstr; 
+
+void LowerTOYRISCVMachineInstrToMCInst(const MachineInstr *MI, MCInst &OutMI);
 
 } // namespace llvm
 
