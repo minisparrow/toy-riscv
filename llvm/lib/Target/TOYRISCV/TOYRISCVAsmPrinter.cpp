@@ -14,7 +14,7 @@ StringRef TOYRISCVAsmPrinter::getPassName() const {
 }
 
 
-#include "RISCVGenMCPseudoLowering.inc"
+#include "TOYRISCVGenMCPseudoLowering.inc"
 void TOYRISCVAsmPrinter::emitInstruction(const MachineInstr *MI) {
   // Do any auto-generated pseudo lowerings.
   if (emitPseudoExpansionLowering(*OutStreamer, MI))

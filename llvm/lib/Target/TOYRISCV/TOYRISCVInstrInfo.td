@@ -145,9 +145,23 @@ class PatGprGpr<SDPatternOperator OpNode, TOYRVInstR Inst>
 class PatGprSimm12<SDPatternOperator OpNode, TOYRVInstI Inst>
     : Pat<(OpNode GPR:$rs1, simm12:$imm12), (Inst GPR:$rs1, simm12:$imm12)>;
 
-/// Simple arithmetic operations
+// arithmetic operations
 def : PatGprGpr<add, ADD>;
 def : PatGprSimm12<add, ADDI>;
+def : PatGprGpr<sub, SUB>;
 
+// logic and shift  
 def : PatGprGpr<and, AND>;
 def : PatGprSimm12<and, ANDI>;
+def : PatGprGpr<or, OR>;
+def : PatGprSimm12<or, ORI>;
+def : PatGprGpr<xor, XOR>;
+def : PatGprSimm12<xor, XORI>;
+def : PatGprGpr<sll, SLL>;
+def : PatGprGpr<srl, SRL>;
+
+/// Setcc
+def : PatGprGpr<setlt, SLT>;
+def : PatGprSimm12<setlt, SLTI>;
+def : PatGprGpr<setult, SLTU>;
+def : PatGprSimm12<setult, SLTIU>;
