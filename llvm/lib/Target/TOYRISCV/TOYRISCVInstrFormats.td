@@ -165,8 +165,8 @@ class TOYRVInstJ<RISCVOpcode opcode, dag outs, dag ins,
   let Opcode = opcode.Value;
 }
 
-class Pseudo<dag outs, dag ins, string opcodestr = "", string argstr> 
-    : TOYRVInst<outs, ins, opcodestr, argstr, [], FormatPseudo> {
+class Pseudo<dag outs, dag ins, list<dag> pattern, string opcodestr = "", string argstr = ""> 
+    : TOYRVInst<outs, ins, opcodestr, argstr, pattern, FormatPseudo> {
   let isPseudo = 1;
   let isCodeGenOnly = 1;
 }

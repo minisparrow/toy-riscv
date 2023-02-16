@@ -12,7 +12,6 @@ TOYRISCVAsmPrinter::TOYRISCVAsmPrinter(TargetMachine &TM,
 StringRef TOYRISCVAsmPrinter::getPassName() const {
   return "TOYRISCV Assembly Printer";
 }
-
 extern "C" void LLVMInitializeTOYRISCVAsmPrinter() {
   RegisterAsmPrinter<TOYRISCVAsmPrinter> X(getTheTOYRISCV32Target());
   RegisterAsmPrinter<TOYRISCVAsmPrinter> Y(getTheTOYRISCV64Target());

@@ -14,6 +14,7 @@ public:
   TOYRISCVAsmPrinter(TargetMachine &TM, std::unique_ptr<MCStreamer> Streamer);
 
   virtual StringRef getPassName() const override;
+  void EmitInstruction(const MachineInstr *MI) override;
 };
 
 } // namespace llvm

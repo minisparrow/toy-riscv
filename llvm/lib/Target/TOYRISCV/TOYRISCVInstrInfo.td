@@ -13,9 +13,18 @@ def SDT_CallSeqEnd   : SDCallSeqEnd  <[SDTCisVT<0, XLenVT>, SDTCisVT<1, XLenVT>]
 def CallSeqStart : SDNode<"ISD::CALLSEQ_START", SDT_CallSeqStart, [SDNPHasChain, SDNPOutGlue]>;
 def CallSeqEnd   : SDNode<"ISD::CALLSEQ_END",   SDT_CallSeqEnd,   [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue]>;
 
+// Target-independent nodes, but with target-specific formats.
+def callseq_start : SDNode<"ISD::CALLSEQ_START", SDT_CallSeqStart,
+                           [SDNPHasChain, SDNPOutGlue]>;
+def callseq_end   : SDNode<"ISD::CALLSEQ_END", SDT_CallSeqEnd,
+                           [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue]>;
+
+def toyriscv_ret_flag  : SDNode<"TOYRISCVISD::RET_FLAG", SDTNone,
+                             [SDNPHasChain, SDNPOptInGlue, SDNPVariadic]>;
+
 let Defs = [SP], Uses = [SP], hasSideEffects = 1 in {
-  def ADJCALLSTACKDOWN : Pseudo<(outs), (ins simm12:$amt1, simm12:$amt2), "", "">;
-  def ADJCALLSTACKUP   : Pseudo<(outs), (ins simm12:$amt1, simm12:$amt2), "", "">;
+  def ADJCALLSTACKDOWN : Pseudo<(outs), (ins simm12:$amt1, simm12:$amt2), [(callseq_start timm:$amt1, timm:$amt2)]>;
+  def ADJCALLSTACKUP   : Pseudo<(outs), (ins simm12:$amt1, simm12:$amt2), [(callseq_end timm:$amt1, timm:$amt2)]>;
 }
 
 //===----------- R-TYPE-------------====
@@ -113,3 +122,32 @@ let isCall = 1 in
 def JAL : TOYRVInstJ<OPC_JAL, (outs GPR:$rd), (ins simm20u:$imm20),
                   "jal", "$rd, $imm20">;
 }
+//===---------------------------------------------------====
+//              RISCV specific DAG nodes 
+//===---------------------------------------------------====
+def RetFlag : SDNode<"TOYRVISD::RET_FLAG", SDTNone,
+                    [SDNPHasChain, SDNPOptInGlue, SDNPVariadic]>;
+
+
+//===---------------------------------------------------====
+//              RISCV Pattern 
+//===---------------------------------------------------====
+// let isBarrier = 1, isBranch = 1, isTerminator = 1 in {
+// def PseudoBR : Pseudo<(outs), (ins simm20u:$imm20), [(br bb:$imm20)]>, PseudoInstExpansion<(JAL ZERO, simm20u:$imm20)>;
+// }
+
+let isBarrier = 1, isReturn = 1, isTerminator = 1 in
+def PseudoRET : Pseudo<(outs), (ins), [(toyriscv_ret_flag)]>,
+                PseudoInstExpansion<(JALR ZERO, RA, 0)>;
+
+class PatGprGpr<SDPatternOperator OpNode, TOYRVInstR Inst>
+    : Pat<(OpNode GPR:$rs1, GPR:$rs2), (Inst GPR:$rs1, GPR:$rs2)>;
+class PatGprSimm12<SDPatternOperator OpNode, TOYRVInstI Inst>
+    : Pat<(OpNode GPR:$rs1, simm12:$imm12), (Inst GPR:$rs1, simm12:$imm12)>;
+
+/// Simple arithmetic operations
+def : PatGprGpr<add, ADD>;
+def : PatGprSimm12<add, ADDI>;
+
+def : PatGprGpr<and, AND>;
+def : PatGprSimm12<and, ANDI>;
