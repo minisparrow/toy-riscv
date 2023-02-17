@@ -8,6 +8,23 @@ def simm20u : Operand<XLenVT>, ImmLeaf<XLenVT, [{return isInt<32>(Imm) && !(Imm 
 }
 def simm32: Operand<XLenVT>, ImmLeaf<XLenVT, [{return isInt<32>(Imm);}]>;
 
+// Extract least significant 12 bits from an immediate value and sign extend
+// them.
+def LO12Sext : SDNodeXForm<imm, [{
+  return CurDAG->getTargetConstant(SignExtend64<12>(N->getZExtValue()),
+                                   SDLoc(N), N->getValueType(0));
+}]>;
+
+// Extract the most significant 20 bits from an immediate value. Add 1 if bit
+// 11 is 1, to compensate for the low 12 bits in the matching immediate addi
+// or ld/st being negative.
+def HI20 : SDNodeXForm<imm, [{
+  return CurDAG->getTargetConstant(((N->getZExtValue()+0x800) >> 12) & 0xfffff,
+                                   SDLoc(N), N->getValueType(0));
+}]>;
+
+
+
 def SDT_CallSeqStart : SDCallSeqStart<[SDTCisVT<0, XLenVT>, SDTCisVT<1, XLenVT>]>;
 def SDT_CallSeqEnd   : SDCallSeqEnd  <[SDTCisVT<0, XLenVT>, SDTCisVT<1, XLenVT>]>;
 def CallSeqStart : SDNode<"ISD::CALLSEQ_START", SDT_CallSeqStart, [SDNPHasChain, SDNPOutGlue]>;
@@ -157,7 +174,7 @@ def : PatGprGpr<or, OR>;
 def : PatGprSimm12<or, ORI>;
 def : PatGprGpr<xor, XOR>;
 def : PatGprSimm12<xor, XORI>;
-def : PatGprGpr<sll, SLL>;
+def : PatGprGpr<shl, SLL>;
 def : PatGprGpr<srl, SRL>;
 
 /// Setcc
@@ -165,3 +182,9 @@ def : PatGprGpr<setlt, SLT>;
 def : PatGprSimm12<setlt, SLTI>;
 def : PatGprGpr<setult, SLTU>;
 def : PatGprSimm12<setult, SLTIU>;
+
+
+/// Immediates
+def : Pat<(simm12:$imm), (ADDI ZERO, simm12:$imm)>;
+// TODO: Add a pattern for immediates with all zeroes in the lower 12 bits.
+def : Pat<(simm32:$imm), (ADDI (LUI (HI20 imm:$imm)), (LO12Sext imm:$imm))>;

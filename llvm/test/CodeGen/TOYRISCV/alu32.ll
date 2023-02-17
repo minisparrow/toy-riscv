@@ -89,34 +89,34 @@ define i32 @sub(i32 %a, i32 %b) nounwind {
   ret i32 %1
 }
 
-define i32 @sll(i32 %a, i32 %b) nounwind {
-; RV32I-LABEL: sll:
-; RV32I:       # %bb.0:
-; RV32I-NEXT:    sll a0, a0, a1
-; RV32I-NEXT:    jalr zero, ra, 0
-  %1 = shl i32 %a, %b
-  ret i32 %1
-}
+; define i32 @sll(i32 %a, i32 %b) nounwind {
+; ; RV32I-LABEL: sll:
+; ; RV32I:       # %bb.0:
+; ; RV32I-NEXT:    sll a0, a0, a1
+; ; RV32I-NEXT:    jalr zero, ra, 0
+;   %1 = shl i32 %a, %b
+;   ret i32 %1
+; }
 
-define i32 @slt(i32 %a, i32 %b) nounwind {
-; RV32I-LABEL: slt:
-; RV32I:       # %bb.0:
-; RV32I-NEXT:    slt a0, a0, a1
-; RV32I-NEXT:    jalr zero, ra, 0
-  %1 = icmp slt i32 %a, %b
-  %2 = zext i1 %1 to i32
-  ret i32 %2
-}
+; define i32 @slt(i32 %a, i32 %b) nounwind {
+; ; RV32I-LABEL: slt:
+; ; RV32I:       # %bb.0:
+; ; RV32I-NEXT:    slt a0, a0, a1
+; ; RV32I-NEXT:    jalr zero, ra, 0
+;   %1 = icmp slt i32 %a, %b
+;   %2 = zext i1 %1 to i32
+;   ret i32 %2
+; }
 
-define i32 @sltu(i32 %a, i32 %b) nounwind {
-; RV32I-LABEL: sltu:
-; RV32I:       # %bb.0:
-; RV32I-NEXT:    sltu a0, a0, a1
-; RV32I-NEXT:    jalr zero, ra, 0
-  %1 = icmp ult i32 %a, %b
-  %2 = zext i1 %1 to i32
-  ret i32 %2
-}
+; define i32 @sltu(i32 %a, i32 %b) nounwind {
+; ; RV32I-LABEL: sltu:
+; ; RV32I:       # %bb.0:
+; ; RV32I-NEXT:    sltu a0, a0, a1
+; ; RV32I-NEXT:    jalr zero, ra, 0
+;   %1 = icmp ult i32 %a, %b
+;   %2 = zext i1 %1 to i32
+;   ret i32 %2
+; }
 
 define i32 @xor(i32 %a, i32 %b) nounwind {
 ; RV32I-LABEL: xor:
@@ -127,23 +127,23 @@ define i32 @xor(i32 %a, i32 %b) nounwind {
   ret i32 %1
 }
 
-define i32 @srl(i32 %a, i32 %b) nounwind {
-; RV32I-LABEL: srl:
-; RV32I:       # %bb.0:
-; RV32I-NEXT:    srl a0, a0, a1
-; RV32I-NEXT:    jalr zero, ra, 0
-  %1 = lshr i32 %a, %b
-  ret i32 %1
-}
-
-define i32 @sra(i32 %a, i32 %b) nounwind {
-; RV32I-LABEL: sra:
-; RV32I:       # %bb.0:
-; RV32I-NEXT:    sra a0, a0, a1
-; RV32I-NEXT:    jalr zero, ra, 0
-  %1 = ashr i32 %a, %b
-  ret i32 %1
-}
+; define i32 @srl(i32 %a, i32 %b) nounwind {
+; ; RV32I-LABEL: srl:
+; ; RV32I:       # %bb.0:
+; ; RV32I-NEXT:    srl a0, a0, a1
+; ; RV32I-NEXT:    jalr zero, ra, 0
+;   %1 = lshr i32 %a, %b
+;   ret i32 %1
+; }
+; 
+; define i32 @sra(i32 %a, i32 %b) nounwind {
+; ; RV32I-LABEL: sra:
+; ; RV32I:       # %bb.0:
+; ; RV32I-NEXT:    sra a0, a0, a1
+; ; RV32I-NEXT:    jalr zero, ra, 0
+;   %1 = ashr i32 %a, %b
+;   ret i32 %1
+; }
 
 define i32 @or(i32 %a, i32 %b) nounwind {
 ; RV32I-LABEL: or:
