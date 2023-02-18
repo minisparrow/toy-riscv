@@ -96,6 +96,22 @@ def LW  : Load_ri<0b010, "lw">;
 def LBU : Load_ri<0b100, "lbu">;
 def LHU : Load_ri<0b101, "lhu">;
 
+
+/// Loads Pattern
+multiclass LdPat<PatFrag LoadOp, TOYRVInst Inst> {
+  def : Pat<(LoadOp GPR:$rs1), (Inst GPR:$rs1, 0)>;
+  def : Pat<(LoadOp (add GPR:$rs1, simm12:$imm12)),
+            (Inst GPR:$rs1, simm12:$imm12)>;
+}
+
+defm : LdPat<sextloadi8, LB>;
+defm : LdPat<extloadi8, LB>;
+defm : LdPat<sextloadi16, LH>;
+defm : LdPat<extloadi16, LH>;
+defm : LdPat<load, LW>;
+defm : LdPat<zextloadi8, LBU>;
+defm : LdPat<zextloadi16, LHU>;
+
 //===----------- S-TYPE-------------====
 let hasSideEffects = 0, mayLoad = 0, mayStore = 1 in
 class Store_rri<bits<3> funct3, string opcodestr>
@@ -106,6 +122,18 @@ class Store_rri<bits<3> funct3, string opcodestr>
 def SB : Store_rri<0b000, "sb">; 
 def SH : Store_rri<0b001, "sh">; 
 def SW : Store_rri<0b010, "sw">; 
+
+/// Store Pattern
+multiclass StPat<PatFrag StoreOp, TOYRVInst Inst> {
+  def : Pat<(StoreOp GPR:$rs2, GPR:$rs1), (Inst GPR:$rs2, GPR:$rs1, 0)>;
+  def : Pat<(StoreOp GPR:$rs2, (add GPR:$rs1, simm12:$imm12)),
+            (Inst GPR:$rs2, GPR:$rs1, simm12:$imm12)>;
+}
+
+defm : StPat<truncstorei8, SB>;
+defm : StPat<truncstorei16, SH>;
+defm : StPat<store, SW>;
+
 
 //===----------- B-TYPE-------------====
 let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in

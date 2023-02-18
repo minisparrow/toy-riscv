@@ -44,6 +44,9 @@ TOYRISCVTargetLowering::TOYRISCVTargetLowering(TOYRISCVTargetMachine const &TM,
   setStackPointerRegisterToSaveRestore(TOYRISCV::SP);
 
   // TODO: add all necessary setOperationAction calls.
+  for (auto N : {ISD::EXTLOAD, ISD::SEXTLOAD, ISD::ZEXTLOAD}) {
+     setLoadExtAction(N, XLenVT, MVT::i1, Promote);
+  }
 
   setBooleanContents(ZeroOrOneBooleanContent);
 
