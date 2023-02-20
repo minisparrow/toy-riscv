@@ -3,6 +3,7 @@
 
 #include "MCTargetDesc/TOYRISCVMCTargetDesc.h"
 #include "llvm/Target/TargetMachine.h"
+#include "MCTargetDesc/TOYRISCVBaseInfo.h"
 
 namespace llvm {
 

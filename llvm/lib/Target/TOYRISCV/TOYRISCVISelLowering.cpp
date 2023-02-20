@@ -48,6 +48,8 @@ TOYRISCVTargetLowering::TOYRISCVTargetLowering(TOYRISCVTargetMachine const &TM,
      setLoadExtAction(N, XLenVT, MVT::i1, Promote);
   }
 
+  setOperationAction(ISD::GlobalAddress, XLenVT, Custom);
+
   setBooleanContents(ZeroOrOneBooleanContent);
 
   // Function alignments (log2).
@@ -64,8 +66,79 @@ SDValue TOYRISCVTargetLowering::LowerOperation(SDValue Op,
     report_fatal_error("unimplemented operand");
   case ISD::BRCOND: 
     return lowerBRCOND(Op, DAG);
+  case ISD::GlobalAddress:
+    return lowerGlobalAddress(Op, DAG);
+  }
+     
+}
+
+static SDValue getTargetNode(GlobalAddressSDNode *N, SDLoc DL, EVT Ty,
+                             SelectionDAG &DAG, unsigned Flags) {
+  return DAG.getTargetGlobalAddress(N->getGlobal(), DL, Ty, 0, Flags);
+}
+
+template <class NodeTy>
+SDValue TOYRISCVTargetLowering::getAddr(NodeTy *N, SelectionDAG &DAG,
+                                        bool IsLocal) const {
+  SDLoc DL(N);
+  EVT Ty = getPointerTy(DAG.getDataLayout());
+
+  if (isPositionIndependent()) {
+    SDValue Addr = getTargetNode(N, DL, Ty, DAG, 0);
+    if (IsLocal)
+      // Use PC-relative addressing to access the symbol. This generates the
+      // pattern (PseudoLLA sym), which expands to (addi (auipc %pcrel_hi(sym))
+      // %pcrel_lo(auipc)).
+      return SDValue(DAG.getMachineNode(TOYRISCV::PseudoLLA, DL, Ty, Addr), 0);
+
+    // Use PC-relative addressing to access the GOT for this symbol, then load
+    // the address from the GOT. This generates the pattern (PseudoLA sym),
+    // which expands to (ld (addi (auipc %got_pcrel_hi(sym)) %pcrel_lo(auipc))).
+    return SDValue(DAG.getMachineNode(TOYRISCV::PseudoLA, DL, Ty, Addr), 0);
+  }
+
+  switch (getTargetMachine().getCodeModel()) {
+  default:
+    report_fatal_error("Unsupported code model for lowering");
+  case CodeModel::Small: {
+    // Generate a sequence for accessing addresses within the first 2 GiB of
+    // address space. This generates the pattern (addi (lui %hi(sym)) %lo(sym)).
+    SDValue AddrHi = getTargetNode(N, DL, Ty, DAG, TOYRISCVII::MO_HI);
+    SDValue AddrLo = getTargetNode(N, DL, Ty, DAG, TOYRISCVII::MO_LO);
+    SDValue MNHi = SDValue(DAG.getMachineNode(TOYRISCV::LUI, DL, Ty, AddrHi), 0);
+    return SDValue(DAG.getMachineNode(TOYRISCV::ADDI, DL, Ty, MNHi, AddrLo), 0);
+  }
+  case CodeModel::Medium: {
+    // Generate a sequence for accessing addresses within any 2GiB range within
+    // the address space. This generates the pattern (PseudoLLA sym), which
+    // expands to (addi (auipc %pcrel_hi(sym)) %pcrel_lo(auipc)).
+    SDValue Addr = getTargetNode(N, DL, Ty, DAG, 0);
+    return SDValue(DAG.getMachineNode(TOYRISCV::PseudoLLA, DL, Ty, Addr), 0);
+  }
   }
 }
+SDValue TOYRISCVTargetLowering::lowerGlobalAddress(SDValue Op,
+                                                SelectionDAG &DAG) const {
+  SDLoc DL(Op);
+  EVT Ty = Op.getValueType();
+  GlobalAddressSDNode *N = cast<GlobalAddressSDNode>(Op);
+  int64_t Offset = N->getOffset();
+  MVT XLenVT = Subtarget.getXLenVT();
+
+  const GlobalValue *GV = N->getGlobal();
+  bool IsLocal = getTargetMachine().shouldAssumeDSOLocal(*GV->getParent(), GV);
+  SDValue Addr = getAddr(N, DAG, IsLocal);
+
+  // In order to maximise the opportunity for common subexpression elimination,
+  // emit a separate ADD node for the global address offset instead of folding
+  // it in the global address node. Later peephole optimisations may choose to
+  // fold it back in when profitable.
+  if (Offset != 0)
+    return DAG.getNode(ISD::ADD, DL, Ty, Addr,
+                       DAG.getConstant(Offset, DL, XLenVT));
+  return Addr;
+}
+
 // Changes the condition code and swaps operands if necessary, so the SetCC
 // operation matches one of the comparisons supported directly by branches
 // in the RISC-V ISA. May adjust compares to favor compare with 0 over compare

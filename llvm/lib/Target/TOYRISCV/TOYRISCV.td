@@ -4,16 +4,19 @@ include "llvm/Target/Target.td"
 def RV64 : HwMode<"+64bit">;
 def RV32 : HwMode<"-64bit">;
 
+def TOYRISCVInstrInfo : InstrInfo {
+  let guessInstructionProperties = 0;
+}
+
+def TOYRISCV : Target {
+  let InstructionSet = TOYRISCVInstrInfo;
+}
+
 include "TOYRISCVRegisterInfo.td"
 include "TOYRISCVSchedule.td"
 include "TOYRISCVInstrInfo.td"
 include "TOYRISCVCallingConv.td"
 
-def TOYRISCVInstrInfo : InstrInfo;
-
-def TOYRISCV : Target {
-  let InstructionSet = TOYRISCVInstrInfo;
-}
 
 def FeatureRV64 : SubtargetFeature<"64bit", "HasRV64", "true", "RV64 support">;
 

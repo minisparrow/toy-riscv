@@ -48,6 +48,9 @@ public:
                       SmallVectorImpl<SDValue> const &OutVals, SDLoc const &DL,
                       SelectionDAG &DAG) const override;
   SDValue lowerBRCOND(SDValue Op, SelectionDAG &DAG) const;
+  SDValue lowerGlobalAddress(SDValue Op, SelectionDAG &DAG) const;
+  template <class NodeTy>
+  SDValue getAddr(NodeTy *N, SelectionDAG &DAG, bool IsLocal = true) const;
 };
 
 } // namespace llvm

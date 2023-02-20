@@ -216,3 +216,29 @@ def : PatGprSimm12<setult, SLTIU>;
 def : Pat<(simm12:$imm), (ADDI ZERO, simm12:$imm)>;
 // TODO: Add a pattern for immediates with all zeroes in the lower 12 bits.
 def : Pat<(simm32:$imm), (ADDI (LUI (HI20 imm:$imm)), (LO12Sext imm:$imm))>;
+
+
+//===---------------------------------------------------====
+//             Pseudo  
+//===---------------------------------------------------====
+def BareSymbol : AsmOperandClass {
+  let Name = "BareSymbol";
+  let RenderMethod = "addImmOperands";
+  let DiagnosticType = "InvalidBareSymbol";
+  let ParserMethod = "parseBareSymbol";
+}
+
+// A bare symbol.
+def bare_symbol : Operand<XLenVT> {
+  let ParserMatchClass = BareSymbol;
+}
+
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, Size = 8, isCodeGenOnly = 0,
+    isAsmParserOnly = 1 in
+def PseudoLLA : Pseudo<(outs GPR:$dst), (ins bare_symbol:$src), [],
+                       "lla", "$dst, $src">;
+
+let hasSideEffects = 0, mayLoad = 1, mayStore = 0, Size = 8, isCodeGenOnly = 0,
+    isAsmParserOnly = 1 in
+def PseudoLA : Pseudo<(outs GPR:$dst), (ins bare_symbol:$src), [],
+                      "la", "$dst, $src">;
