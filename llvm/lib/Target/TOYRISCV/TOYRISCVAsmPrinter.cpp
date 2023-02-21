@@ -21,7 +21,7 @@ void TOYRISCVAsmPrinter::emitInstruction(const MachineInstr *MI) {
       return;
 
   MCInst TmpInst;
-  LowerTOYRISCVMachineInstrToMCInst(MI, TmpInst);
+  LowerTOYRISCVMachineInstrToMCInst(MI, TmpInst, *this);
   EmitToStreamer(*OutStreamer, TmpInst);
 }
 

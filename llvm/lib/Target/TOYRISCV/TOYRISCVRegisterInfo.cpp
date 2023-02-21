@@ -46,12 +46,32 @@ void TOYRISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
                                                int SPAdj, unsigned FIOperandNum,
                                                RegScavenger *RS) const {
   // TODO
+  // report_fatal_error("Subroutines not supported yet");
+  // TODO: this implementation is a temporary placeholder which does just
+  // enough to allow other aspects of code generation to be tested
+  assert(SPAdj == 0 && "Unexpected non-zero SPAdj value");
+  MachineInstr &MI = *II;
+  MachineFunction &MF = *MI.getParent()->getParent();
+  const TargetFrameLowering *TFI = MF.getSubtarget().getFrameLowering();
+  DebugLoc DL = MI.getDebugLoc();
+  Register FrameReg = getFrameRegister(MF);
+  int FrameIndex = MI.getOperand(FIOperandNum).getIndex();
+  StackOffset Offset = TFI->getFrameIndexReference(MF, FrameIndex, FrameReg);
+  Offset += StackOffset::getFixed(MI.getOperand(FIOperandNum + 1).getImm());
+  assert(TFI->hasFP(MF) && "eliminateFrameIndex currently requires hasFP");
+  // Offsets must be directly encoded in a 12-bit immediate field
+  if (!isInt<12>(Offset.getFixed())) {
+    report_fatal_error(
+        "Frame offsets outside of the signed 12-bit range not supported");
+  }
+  MI.getOperand(FIOperandNum).ChangeToRegister(FrameReg, false);
+  MI.getOperand(FIOperandNum + 1).ChangeToImmediate(Offset.getFixed());
 }
 
 Register
 TOYRISCVRegisterInfo::getFrameRegister(MachineFunction const &MF) const {
-  // TODO
-  return TOYRISCV::SP;
+  const TargetFrameLowering *TFI = getFrameLowering(MF);
+  return TFI->hasFP(MF) ? TOYRISCV::FP : TOYRISCV::SP;
 }
 
 // vim: set ts=2 sw=2 sts=2:

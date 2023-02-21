@@ -66,7 +66,8 @@ static MCOperand lowerSymbolOperand(const MachineOperand &MO, MCSymbol *Sym,
 }
 
 void llvm::LowerTOYRISCVMachineInstrToMCInst(const MachineInstr *MI,
-                                             MCInst &OutMI) {
+                                             MCInst &OutMI,
+                                             AsmPrinter &AP) {
   OutMI.setOpcode(MI->getOpcode());
 
   for (const MachineOperand &MO : MI->operands()) {
@@ -84,6 +85,9 @@ void llvm::LowerTOYRISCVMachineInstrToMCInst(const MachineInstr *MI,
     case MachineOperand::MO_Immediate:
       MCOp = MCOperand::createImm(MO.getImm());
       break;
+    case MachineOperand::MO_MachineBasicBlock:
+      MCOp = MCOperand::createExpr(MCSymbolRefExpr::create(MO.getMBB()->getSymbol(), AP.OutContext));
+      break;
     }
     OutMI.addOperand(MCOp);
   }
@@ -94,7 +98,7 @@ bool llvm::LowerTOYRISCVMachineOperandToMCOperand(const MachineOperand &MO,
                                                const AsmPrinter &AP) {
   switch (MO.getType()) {
   default:
-    report_fatal_error("LowerRISCVMachineInstrToMCInst: unknown operand type");
+    report_fatal_error("LowerTOYRISCVMachineOperandToMCOperand: unknown operand type");
   case MachineOperand::MO_Register:
     // Ignore all implicit register operands.
     if (MO.isImplicit())

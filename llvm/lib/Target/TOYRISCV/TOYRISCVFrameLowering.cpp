@@ -18,7 +18,12 @@ void TOYRISCVFrameLowering::emitEpilogue(MachineFunction &MF,
 }
 
 bool TOYRISCVFrameLowering::hasFP(const MachineFunction &MF) const {
-  // TODO
+  const TargetRegisterInfo *RegInfo = MF.getSubtarget().getRegisterInfo();
+
+  const MachineFrameInfo &MFI = MF.getFrameInfo();
+  return MF.getTarget().Options.DisableFramePointerElim(MF) ||
+         RegInfo->hasStackRealignment(MF) || MFI.hasVarSizedObjects() ||
+         MFI.isFrameAddressTaken();
   return false;
 }
 

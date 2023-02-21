@@ -14,7 +14,7 @@ class MachineInstr;
 class MachineOperand; 
 class AsmPrinter;
 
-void LowerTOYRISCVMachineInstrToMCInst(const MachineInstr *MI, MCInst &OutMI);
+void LowerTOYRISCVMachineInstrToMCInst(const MachineInstr *MI, MCInst &OutMI, AsmPrinter &AP);
 bool LowerTOYRISCVMachineOperandToMCOperand(const MachineOperand &MO,
                                          MCOperand &MCOp, const AsmPrinter &AP);
 
