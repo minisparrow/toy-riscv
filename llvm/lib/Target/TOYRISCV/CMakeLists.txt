@@ -22,19 +22,6 @@ add_llvm_target(TOYRISCVCodeGen
     TOYRISCVMCInstLower.cpp
     TOYRISCVAsmPrinter.cpp
     TOYRISCVISelDagToDag.cpp
-
-    LINK_COMPONENTS
-    Core 
-    CodeGen
-    MC 
-    TOYRISCVDesc
-    TOYRISCVInfo 
-    SelectionDAG
-    Support 
-    Target 
-
-    ADD_TO_COMPONENT
-    TOYRISCV
 )
 
 add_subdirectory(TargetInfo)

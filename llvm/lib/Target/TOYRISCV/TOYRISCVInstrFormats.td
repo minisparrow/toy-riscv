@@ -134,7 +134,7 @@ class TOYRVInstB<bits<3> funct3, RISCVOpcode opcode, dag outs, dag ins,
   let Inst{14-12} = funct3;
   let Inst{11-8} = imm12{3-0};
   let Inst{7} = imm12{10};
-  let Inst{6-0} = opcode.Value;
+  // let Inst{6-0} = opcode.Value;
   let Opcode = opcode.Value;
 }
 

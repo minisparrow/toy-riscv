@@ -9,9 +9,15 @@ namespace llvm {
 
 class TOYRISCVTargetMachine;
 class MCInst; 
+class MCOperand;
 class MachineInstr; 
+class MachineOperand; 
+class AsmPrinter;
 
 void LowerTOYRISCVMachineInstrToMCInst(const MachineInstr *MI, MCInst &OutMI);
+bool LowerTOYRISCVMachineOperandToMCOperand(const MachineOperand &MO,
+                                         MCOperand &MCOp, const AsmPrinter &AP);
+
 
 } // namespace llvm
 

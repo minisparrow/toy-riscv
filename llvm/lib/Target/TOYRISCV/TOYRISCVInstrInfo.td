@@ -1,5 +1,35 @@
 include "TOYRISCVInstrFormats.td"
 
+class ImmAsmOperand<string prefix, int width, string suffix> : AsmOperandClass {
+  let Name = prefix # "Imm" # width # suffix;
+  let RenderMethod = "addImmOperands";
+  let DiagnosticType = !strconcat("Invalid", Name);
+}
+
+class SImmAsmOperand<int width, string suffix = "">
+    : ImmAsmOperand<"S", width, suffix> {
+}
+
+def Simm21Lsb0JALAsmOperand : SImmAsmOperand<21, "Lsb0JAL"> {
+  // let ParserMethod = "parseJALOffset";
+}
+
+// A 21-bit signed immediate where the least significant bit is zero.
+def simm21_lsb0_jal : Operand<OtherVT> {
+  // let ParserMatchClass = Simm21Lsb0JALAsmOperand;
+  // let PrintMethod = "printBranchOperand";
+  let EncoderMethod = "getImmOpValueAsr1";
+  let DecoderMethod = "decodeSImmOperandAndLsl1<21>";
+  // let MCOperandPredicate = [{
+  //   int64_t Imm;
+  //   if (MCOp.evaluateAsConstantImm(Imm))
+  //     return isShiftedInt<20, 1>(Imm);
+  //   return MCOp.isBareSymbolRef();
+  // }];
+  let OperandType = "OPERAND_PCREL";
+}
+
+
 def simm12 : Operand<XLenVT>, ImmLeaf<XLenVT, [{return isInt<12>(Imm);}]> {
   let DecoderMethod = "decodeImmOperand<12>";
 }
@@ -7,6 +37,12 @@ def simm20u : Operand<XLenVT>, ImmLeaf<XLenVT, [{return isInt<32>(Imm) && !(Imm 
   let DecoderMethod = "decodeImmOperand<20>";
 }
 def simm32: Operand<XLenVT>, ImmLeaf<XLenVT, [{return isInt<32>(Imm);}]>;
+
+def simm13_lsb0 : Operand<OtherVT> {
+   let ParserMatchClass = SImmAsmOperand<13, "Lsb0">;
+   let EncoderMethod = "getImmOpValueAsr1";
+   let DecoderMethod = "decodeSImmOperandAndLsl1<13>";
+ }
 
 // Extract least significant 12 bits from an immediate value and sign extend
 // them.
@@ -38,6 +74,10 @@ def callseq_end   : SDNode<"ISD::CALLSEQ_END", SDT_CallSeqEnd,
 
 def toyriscv_ret_flag  : SDNode<"TOYRISCVISD::RET_FLAG", SDTNone,
                              [SDNPHasChain, SDNPOptInGlue, SDNPVariadic]>;
+
+def SDT_RISCVBrCC : SDTypeProfile<0, 4, []>;
+def toyriscv_brcc : SDNode<"TOYRISCVISD::BR_CC", SDT_RISCVBrCC,
+                               [SDNPHasChain]>;
 
 let Defs = [SP], Uses = [SP], hasSideEffects = 1 in {
   def ADJCALLSTACKDOWN : Pseudo<(outs), (ins simm12:$amt1, simm12:$amt2), [(callseq_start timm:$amt1, timm:$amt2)]>;
@@ -139,7 +179,7 @@ defm : StPat<store, SW>;
 let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
 class BranchCC_rri<bits<3> funct3, string opcodestr>
     : TOYRVInstB<funct3, OPC_BRANCH, (outs),
-              (ins GPR:$rs1, GPR:$rs2, simm12:$imm12),
+              (ins GPR:$rs1, GPR:$rs2, simm13_lsb0:$imm12),
               opcodestr, "$rs1, $rs2, $imm12"> {
   let isBranch = 1;
   let isTerminator = 1;
@@ -150,6 +190,28 @@ def BLT  : BranchCC_rri<0b100, "blt">;
 def BGE  : BranchCC_rri<0b101, "bge">;
 def BLTU : BranchCC_rri<0b110, "bltu">;
 def BGEU : BranchCC_rri<0b111, "bgeu">;
+
+multiclass PatBrcc<CondCode CondOp, TOYRVInstB Inst> {
+   def _rri: Pat<(toyriscv_brcc GPR:$rs1, GPR:$rs2, CondOp, bb:$imm12), (Inst GPR:$rs1, GPR:$rs2, simm13_lsb0 :$imm12)>;
+}
+
+defm : PatBrcc<SETEQ, BEQ>;
+defm : PatBrcc<SETNE, BNE>;
+defm : PatBrcc<SETLT, BLT>;
+defm : PatBrcc<SETGE, BGE>;
+defm : PatBrcc<SETULT, BLTU>;
+defm : PatBrcc<SETUGE, BGEU>;
+
+class PatBrcond<PatFrag CondOp, TOYRVInstB Inst>
+    : Pat<(brcond (i32 (CondOp GPR:$rs1, GPR:$rs2)), bb:$imm12),
+          (Inst GPR:$rs1, GPR:$rs2, simm13_lsb0:$imm12)>;
+
+def : PatBrcond<seteq, BEQ>;
+def : PatBrcond<setne, BNE>;
+def : PatBrcond<setlt, BLT>;
+def : PatBrcond<setge, BGE>;
+def : PatBrcond<setult, BLTU>;
+def : PatBrcond<setuge, BGEU>;
 
 //===----------- U-TYPE-------------====
 let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in {
@@ -164,7 +226,7 @@ def AUIPC : TOYRVInstU<OPC_AUIPC, (outs GPR:$rd), (ins simm20u:$imm20),
 //===----------- J-TYPE-------------====
 let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in {
 let isCall = 1 in
-def JAL : TOYRVInstJ<OPC_JAL, (outs GPR:$rd), (ins simm20u:$imm20),
+def JAL : TOYRVInstJ<OPC_JAL, (outs GPR:$rd), (ins simm21_lsb0_jal:$imm20),
                   "jal", "$rd, $imm20">;
 }
 //===---------------------------------------------------====
@@ -177,9 +239,10 @@ def RetFlag : SDNode<"TOYRVISD::RET_FLAG", SDTNone,
 //===---------------------------------------------------====
 //              RISCV Pattern 
 //===---------------------------------------------------====
-// let isBarrier = 1, isBranch = 1, isTerminator = 1 in {
-// def PseudoBR : Pseudo<(outs), (ins simm20u:$imm20), [(br bb:$imm20)]>, PseudoInstExpansion<(JAL ZERO, simm20u:$imm20)>;
-// }
+let isBarrier = 1, isBranch = 1, isTerminator = 1 in {
+def PseudoBR : Pseudo<(outs), (ins simm21_lsb0_jal:$imm20), [(br bb:$imm20)]>, 
+               PseudoInstExpansion<(JAL ZERO, simm21_lsb0_jal:$imm20)>;
+}
 
 let isBarrier = 1, isReturn = 1, isTerminator = 1 in
 def PseudoRET : Pseudo<(outs), (ins), [(toyriscv_ret_flag)]>,

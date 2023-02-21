@@ -17,6 +17,10 @@ public:
   void emitInstruction(const MachineInstr *MI);
   bool emitPseudoExpansionLowering(MCStreamer &OutStreamer,
                                    const MachineInstr *MI);
+  // Wrapper needed for tblgenned pseudo lowering.
+  bool lowerOperand(const MachineOperand &MO, MCOperand &MCOp) const {
+    return LowerTOYRISCVMachineOperandToMCOperand(MO, MCOp, *this);
+  }
 };
 
 } // namespace llvm

@@ -49,6 +49,8 @@ TOYRISCVTargetLowering::TOYRISCVTargetLowering(TOYRISCVTargetMachine const &TM,
   }
 
   setOperationAction(ISD::GlobalAddress, XLenVT, Custom);
+  setOperationAction(ISD::BR_CC, XLenVT, Expand);
+  setOperationAction(ISD::BRCOND, MVT::Other, Custom);
 
   setBooleanContents(ZeroOrOneBooleanContent);
 

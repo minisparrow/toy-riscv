@@ -16,6 +16,7 @@ enum NodeType : unsigned {
   URET_FLAG,
   SRET_FLAG,
   MRET_FLAG,
+  SELECT_CC,
   BR_CC,
   CALL,
 };

@@ -31,6 +31,8 @@ enum {
   MO_PLT = 2,
   MO_LO = 3,
   MO_HI = 4,
+  MO_PCREL_LO = 5,
+  MO_PCREL_HI = 6,
 };
 
 } // namespace TOYRISCVII
