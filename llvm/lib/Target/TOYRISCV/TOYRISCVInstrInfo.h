@@ -7,6 +7,7 @@
 // #include "TOYRISCV.h"
 #include "TOYRISCVRegisterInfo.h"
 #include "llvm/CodeGen/TargetInstrInfo.h"
+#include "llvm/IR/DiagnosticInfo.h"
 
 #define GET_INSTRINFO_HEADER
 #define GET_INSTRINFO_OPERAND_ENUM
@@ -24,8 +25,8 @@ public:
 
   // TODO
   void copyPhysReg(MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI,
-                   const DebugLoc &DL, unsigned DstReg, unsigned SrcReg,
-                   bool KillSrc) const;
+                   const DebugLoc &DL, MCRegister DstReg, MCRegister SrcReg,
+                   bool KillSrc) const override;
 };
 
 } // namespace llvm

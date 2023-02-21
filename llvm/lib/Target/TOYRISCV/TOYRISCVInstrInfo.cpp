@@ -30,8 +30,8 @@ TOYRISCVInstrInfo::TOYRISCVInstrInfo()
 
 void TOYRISCVInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
                                     MachineBasicBlock::iterator MBBI,
-                                    const DebugLoc &DL, unsigned DstReg,
-                                    unsigned SrcReg, bool KillSrc) const {
+                                    const DebugLoc &DL, MCRegister DstReg,
+                                    MCRegister SrcReg, bool KillSrc) const {
   assert(TOYRISCV::GPRRegClass.contains(DstReg, SrcReg) &&
          "Impossible reg-to-reg copy");
 

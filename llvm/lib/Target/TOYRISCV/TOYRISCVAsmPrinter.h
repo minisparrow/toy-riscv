@@ -14,7 +14,7 @@ public:
   TOYRISCVAsmPrinter(TargetMachine &TM, std::unique_ptr<MCStreamer> Streamer);
 
   virtual StringRef getPassName() const override;
-  void emitInstruction(const MachineInstr *MI);
+  void emitInstruction(const MachineInstr *MI) override;
   bool emitPseudoExpansionLowering(MCStreamer &OutStreamer,
                                    const MachineInstr *MI);
   // Wrapper needed for tblgenned pseudo lowering.
