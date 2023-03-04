@@ -23,6 +23,7 @@ public:
   std::pair<char const *, uint64_t> getMnemonic(MCInst const *MI) override;
   void printInstruction(MCInst const *MI, uint64_t Address, raw_ostream &OS);
   static char const *getRegisterName(unsigned RegNo);
+  static char const *getRegisterName(unsigned RegNo, unsigned AltIdx);
   bool printAliasInstr(MCInst const *MI, uint64_t Address, raw_ostream &OS);
 };
 

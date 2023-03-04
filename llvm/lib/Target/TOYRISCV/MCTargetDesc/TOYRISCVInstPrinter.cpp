@@ -57,6 +57,11 @@ void TOYRISCVInstPrinter::printOperand(MCInst const *MI, uint64_t _Address,
   printOperand(MI, OpNum, O);
 }
 
+const char *TOYRISCVInstPrinter::getRegisterName(unsigned RegNo) {
+  return getRegisterName(RegNo, TOYRISCV::ABIRegAltName);
+}
+
+
 // std::pair<char const *, uint64_t>
 // TOYRISCVInstPrinter::getMnemonic(MCInst const *MI) {}
 

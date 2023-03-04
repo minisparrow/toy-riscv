@@ -8,7 +8,9 @@ let Namespace = "TOYRISCV" in {
 }
 
 // Define 32 general purpose integer registers
-let Namespace = "TOYRISCV" in {
+// let Namespace = "TOYRISCV" in {
+def ABIRegAltName : RegAltNameIndex;
+let RegAltNameIndices = [ABIRegAltName] in {
   def ZERO : GPRReg<0,  "x0", ["zero"]>,  DwarfRegNum<[0]>;
   def RA   : GPRReg<1,  "x1", ["ra"]>,   DwarfRegNum<[1]>;
   def SP   : GPRReg<2,  "x2", ["sp"]>,   DwarfRegNum<[2]>;
