@@ -232,9 +232,47 @@ def JAL : TOYRVInstJ<OPC_JAL, (outs GPR:$rd), (ins simm21_lsb0_jal:$imm20),
 //===---------------------------------------------------====
 //              RISCV specific DAG nodes 
 //===---------------------------------------------------====
-def RetFlag : SDNode<"TOYRVISD::RET_FLAG", SDTNone,
+def SDT_RISCVSelectCC     : SDTypeProfile<1, 5, [SDTCisSameAs<1, 2>,
+                                                 SDTCisSameAs<0, 4>,
+                                                 SDTCisSameAs<4, 5>]>;
+
+def RetFlag : SDNode<"TOYRISCVISD::RET_FLAG", SDTNone,
                     [SDNPHasChain, SDNPOptInGlue, SDNPVariadic]>;
 
+// def SelectCC     : SDNode<"TOYRISCVISD::SELECT_CC", SDT_RISCVSelectCC>;
+// let usesCustomInserter = 1 in
+// def Select_GPR_Using_CC_GPR
+//     : Pseudo<(outs GPR:$dst),
+//              (ins GPR:$lhs, GPR:$rhs, ixlenimm:$imm, GPR:$src, GPR:$src2),
+//              [(set XLenVT:$dst, (SelectCC GPR:$lhs, GPR:$rhs,
+//               (XLenVT imm:$imm), GPR:$src, GPR:$src2))]>;
+
+// A parameterized register class alternative to i32imm/i64imm from Target.td.
+def ixlenimm : Operand<XLenVT>;
+def riscv_selectcc  : SDNode<"TOYRISCVISD::SELECT_CC", SDT_RISCVSelectCC>;
+def IntCCtoRISCVCC : SDNodeXForm<riscv_selectcc, [{
+  ISD::CondCode CC = cast<CondCodeSDNode>(N->getOperand(2))->get();
+  TOYRISCVCC::CondCode BrCC = getRISCVCCForIntCC(CC);
+  return CurDAG->getTargetConstant(BrCC, SDLoc(N), Subtarget->getXLenVT());
+}]>;
+
+def riscv_selectcc_frag : PatFrag<(ops node:$lhs, node:$rhs, node:$cc,
+                                       node:$truev, node:$falsev),
+                                  (riscv_selectcc node:$lhs, node:$rhs,
+                                                  node:$cc, node:$truev,
+                                                  node:$falsev), [{}],
+                                  IntCCtoRISCVCC>;
+
+let usesCustomInserter = 1 in
+class SelectCC_rrirr<RegisterClass valty, RegisterClass cmpty>
+    : Pseudo<(outs valty:$dst),
+             (ins cmpty:$lhs, cmpty:$rhs, ixlenimm:$imm,
+              valty:$truev, valty:$falsev),
+             [(set valty:$dst,
+               (riscv_selectcc_frag:$imm cmpty:$lhs, cmpty:$rhs, cond,
+                                         valty:$truev, valty:$falsev))]>;
+
+def Select_GPR_Using_CC_GPR : SelectCC_rrirr<GPR, GPR>;
 
 //===---------------------------------------------------====
 //              RISCV Pattern 

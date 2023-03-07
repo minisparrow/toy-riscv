@@ -41,3 +41,22 @@ void TOYRISCVInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
   return; 
 }
 // vim: set ts=2 sw=2 sts=2:
+
+const MCInstrDesc &TOYRISCVInstrInfo::getBrCond(TOYRISCVCC::CondCode CC) const {
+  switch (CC) {
+  default:
+    llvm_unreachable("Unknown condition code!");
+  case TOYRISCVCC::COND_EQ:
+    return get(TOYRISCV::BEQ);
+  case TOYRISCVCC::COND_NE:
+    return get(TOYRISCV::BNE);
+  case TOYRISCVCC::COND_LT:
+    return get(TOYRISCV::BLT);
+  case TOYRISCVCC::COND_GE:
+    return get(TOYRISCV::BGE);
+  case TOYRISCVCC::COND_LTU:
+    return get(TOYRISCV::BLTU);
+  case TOYRISCVCC::COND_GEU:
+    return get(TOYRISCV::BGEU);
+  }
+}

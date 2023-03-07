@@ -17,11 +17,27 @@ namespace llvm {
 
 class TOYRISCVSubtarget;
 
+
+namespace TOYRISCVCC {
+enum CondCode {
+  COND_EQ,
+  COND_NE,
+  COND_LT,
+  COND_GE,
+  COND_LTU,
+  COND_GEU,
+  COND_INVALID
+};
+}
+
 class TOYRISCVInstrInfo : public TOYRISCVGenInstrInfo {
   // virtual void anchor();
 
 public:
   explicit TOYRISCVInstrInfo();
+
+  const MCInstrDesc &getBrCond(TOYRISCVCC::CondCode CC) const;
+
 
   // TODO
   void copyPhysReg(MachineBasicBlock &MBB, MachineBasicBlock::iterator MBBI,

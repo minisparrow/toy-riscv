@@ -18,6 +18,27 @@ public:
   StringRef getPassName() const override;
   void Select(SDNode *N) override;
   bool runOnMachineFunction(MachineFunction &MF) override;
+  // Return the RISC-V condition code that matches the given DAG integer
+  // condition code. The CondCode must be one of those supported by the RISC-V
+  // ISA (see translateSetCCForBranch).
+  static TOYRISCVCC::CondCode getRISCVCCForIntCC(ISD::CondCode CC) {
+    switch (CC) {
+    default:
+      llvm_unreachable("Unsupported CondCode");
+    case ISD::SETEQ:
+      return TOYRISCVCC::COND_EQ;
+    case ISD::SETNE:
+      return TOYRISCVCC::COND_NE;
+    case ISD::SETLT:
+      return TOYRISCVCC::COND_LT;
+    case ISD::SETGE:
+      return TOYRISCVCC::COND_GE;
+    case ISD::SETULT:
+      return TOYRISCVCC::COND_LTU;
+    case ISD::SETUGE:
+      return TOYRISCVCC::COND_GEU;
+    }
+  }
 };
 
 } // namespace llvm

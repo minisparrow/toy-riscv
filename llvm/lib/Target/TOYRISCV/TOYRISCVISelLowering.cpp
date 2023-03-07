@@ -51,6 +51,8 @@ TOYRISCVTargetLowering::TOYRISCVTargetLowering(TOYRISCVTargetMachine const &TM,
   setOperationAction(ISD::GlobalAddress, XLenVT, Custom);
   setOperationAction(ISD::BR_CC, XLenVT, Expand);
   setOperationAction(ISD::BRCOND, MVT::Other, Custom);
+  setOperationAction(ISD::SELECT, XLenVT, Custom);
+  setOperationAction(ISD::SELECT_CC, XLenVT, Expand);
 
   setBooleanContents(ZeroOrOneBooleanContent);
 
@@ -70,9 +72,45 @@ SDValue TOYRISCVTargetLowering::LowerOperation(SDValue Op,
     return lowerBRCOND(Op, DAG);
   case ISD::GlobalAddress:
     return lowerGlobalAddress(Op, DAG);
+  case ISD::SELECT:
+    return lowerSELECT(Op, DAG);
   }
-     
 }
+
+
+// Changes the condition code and swaps operands if necessary, so the SetCC
+// operation matches one of the comparisons supported directly by branches
+// in the RISC-V ISA. May adjust compares to favor compare with 0 over compare
+// with 1/-1.
+static void translateSetCCForBranch(const SDLoc &DL, SDValue &LHS, SDValue &RHS,
+                                    ISD::CondCode &CC, SelectionDAG &DAG) {
+  // Convert X > -1 to X >= 0.
+  if (CC == ISD::SETGT && isAllOnesConstant(RHS)) {
+    RHS = DAG.getConstant(0, DL, RHS.getValueType());
+    CC = ISD::SETGE;
+    return;
+  }
+  // Convert X < 1 to 0 >= X.
+  if (CC == ISD::SETLT && isOneConstant(RHS)) {
+    RHS = LHS;
+    LHS = DAG.getConstant(0, DL, RHS.getValueType());
+    CC = ISD::SETGE;
+    return;
+  }
+
+  switch (CC) {
+  default:
+    break;
+  case ISD::SETGT:
+  case ISD::SETLE:
+  case ISD::SETUGT:
+  case ISD::SETULE:
+    CC = ISD::getSetCCSwappedOperands(CC);
+    std::swap(LHS, RHS);
+    break;
+  }
+}
+
 
 static SDValue getTargetNode(GlobalAddressSDNode *N, SDLoc DL, EVT Ty,
                              SelectionDAG &DAG, unsigned Flags) {
@@ -141,36 +179,210 @@ SDValue TOYRISCVTargetLowering::lowerGlobalAddress(SDValue Op,
   return Addr;
 }
 
-// Changes the condition code and swaps operands if necessary, so the SetCC
-// operation matches one of the comparisons supported directly by branches
-// in the RISC-V ISA. May adjust compares to favor compare with 0 over compare
-// with 1/-1.
-static void translateSetCCForBranch(const SDLoc &DL, SDValue &LHS, SDValue &RHS,
-                                    ISD::CondCode &CC, SelectionDAG &DAG) {
-  // Convert X > -1 to X >= 0.
-  if (CC == ISD::SETGT && isAllOnesConstant(RHS)) {
-    RHS = DAG.getConstant(0, DL, RHS.getValueType());
-    CC = ISD::SETGE;
-    return;
-  }
-  // Convert X < 1 to 0 >= X.
-  if (CC == ISD::SETLT && isOneConstant(RHS)) {
-    RHS = LHS;
-    LHS = DAG.getConstant(0, DL, RHS.getValueType());
-    CC = ISD::SETGE;
-    return;
+SDValue TOYRISCVTargetLowering::lowerSELECT(SDValue Op, SelectionDAG &DAG) const {
+  SDValue CondV = Op.getOperand(0);
+  SDValue TrueV = Op.getOperand(1);
+  SDValue FalseV = Op.getOperand(2);
+  SDLoc DL(Op);
+  MVT VT = Op.getSimpleValueType();
+  MVT XLenVT = Subtarget.getXLenVT();
+
+  // Lower vector SELECTs to VSELECTs by splatting the condition.
+  if (VT.isVector()) {
+    MVT SplatCondVT = VT.changeVectorElementType(MVT::i1);
+    SDValue CondSplat = VT.isScalableVector()
+                            ? DAG.getSplatVector(SplatCondVT, DL, CondV)
+                            : DAG.getSplatBuildVector(SplatCondVT, DL, CondV);
+    return DAG.getNode(ISD::VSELECT, DL, VT, CondSplat, TrueV, FalseV);
   }
 
-  switch (CC) {
+  // If the result type is XLenVT and CondV is the output of a SETCC node
+  // which also operated on XLenVT inputs, then merge the SETCC node into the
+  // lowered RISCVISD::SELECT_CC to take advantage of the integer
+  // compare+branch instructions. i.e.:
+  // (select (setcc lhs, rhs, cc), truev, falsev)
+  // -> (riscvisd::select_cc lhs, rhs, cc, truev, falsev)
+  if (VT == XLenVT && CondV.getOpcode() == ISD::SETCC &&
+      CondV.getOperand(0).getSimpleValueType() == XLenVT) {
+    SDValue LHS = CondV.getOperand(0);
+    SDValue RHS = CondV.getOperand(1);
+    const auto *CC = cast<CondCodeSDNode>(CondV.getOperand(2));
+    ISD::CondCode CCVal = CC->get();
+
+    // Special case for a select of 2 constants that have a diffence of 1.
+    // Normally this is done by DAGCombine, but if the select is introduced by
+    // type legalization or op legalization, we miss it. Restricting to SETLT
+    // case for now because that is what signed saturating add/sub need.
+    // FIXME: We don't need the condition to be SETLT or even a SETCC,
+    // but we would probably want to swap the true/false values if the condition
+    // is SETGE/SETLE to avoid an XORI.
+    if (isa<ConstantSDNode>(TrueV) && isa<ConstantSDNode>(FalseV) &&
+        CCVal == ISD::SETLT) {
+      const APInt &TrueVal = cast<ConstantSDNode>(TrueV)->getAPIntValue();
+      const APInt &FalseVal = cast<ConstantSDNode>(FalseV)->getAPIntValue();
+      if (TrueVal - 1 == FalseVal)
+        return DAG.getNode(ISD::ADD, DL, Op.getValueType(), CondV, FalseV);
+      if (TrueVal + 1 == FalseVal)
+        return DAG.getNode(ISD::SUB, DL, Op.getValueType(), FalseV, CondV);
+    }
+
+    translateSetCCForBranch(DL, LHS, RHS, CCVal, DAG);
+
+    SDValue TargetCC = DAG.getCondCode(CCVal);
+    SDValue Ops[] = {LHS, RHS, TargetCC, TrueV, FalseV};
+    return DAG.getNode(TOYRISCVISD::SELECT_CC, DL, Op.getValueType(), Ops);
+  }
+
+  // Otherwise:
+  // (select condv, truev, falsev)
+  // -> (riscvisd::select_cc condv, zero, setne, truev, falsev)
+  SDValue Zero = DAG.getConstant(0, DL, XLenVT);
+  SDValue SetNE = DAG.getCondCode(ISD::SETNE);
+
+  SDValue Ops[] = {CondV, Zero, SetNE, TrueV, FalseV};
+
+  return DAG.getNode(TOYRISCVISD::SELECT_CC, DL, Op.getValueType(), Ops);
+}
+
+static bool isSelectPseudo(MachineInstr &MI) {
+  switch (MI.getOpcode()) {
   default:
-    break;
-  case ISD::SETGT:
-  case ISD::SETLE:
-  case ISD::SETUGT:
-  case ISD::SETULE:
-    CC = ISD::getSetCCSwappedOperands(CC);
-    std::swap(LHS, RHS);
-    break;
+    return false;
+  case TOYRISCV::Select_GPR_Using_CC_GPR:
+    return true;
+  }
+}
+
+static MachineBasicBlock *emitSelectPseudo(MachineInstr &MI,
+                                           MachineBasicBlock *BB,
+                                           const TOYRISCVSubtarget &Subtarget) {
+  // To "insert" Select_* instructions, we actually have to insert the triangle
+  // control-flow pattern.  The incoming instructions know the destination vreg
+  // to set, the condition code register to branch on, the true/false values to
+  // select between, and the condcode to use to select the appropriate branch.
+  //
+  // We produce the following control flow:
+  //     HeadMBB
+  //     |  \
+  //     |  IfFalseMBB
+  //     | /
+  //    TailMBB
+  //
+  // When we find a sequence of selects we attempt to optimize their emission
+  // by sharing the control flow. Currently we only handle cases where we have
+  // multiple selects with the exact same condition (same LHS, RHS and CC).
+  // The selects may be interleaved with other instructions if the other
+  // instructions meet some requirements we deem safe:
+  // - They are debug instructions. Otherwise,
+  // - They do not have side-effects, do not access memory and their inputs do
+  //   not depend on the results of the select pseudo-instructions.
+  // The TrueV/FalseV operands of the selects cannot depend on the result of
+  // previous selects in the sequence.
+  // These conditions could be further relaxed. See the X86 target for a
+  // related approach and more information.
+  Register LHS = MI.getOperand(1).getReg();
+  Register RHS = MI.getOperand(2).getReg();
+  auto CC = static_cast<TOYRISCVCC::CondCode>(MI.getOperand(3).getImm());
+
+  SmallVector<MachineInstr *, 4> SelectDebugValues;
+  SmallSet<Register, 4> SelectDests;
+  SelectDests.insert(MI.getOperand(0).getReg());
+
+  MachineInstr *LastSelectPseudo = &MI;
+
+  for (auto E = BB->end(), SequenceMBBI = MachineBasicBlock::iterator(MI);
+       SequenceMBBI != E; ++SequenceMBBI) {
+    if (SequenceMBBI->isDebugInstr())
+      continue;
+    else if (isSelectPseudo(*SequenceMBBI)) {
+      if (SequenceMBBI->getOperand(1).getReg() != LHS ||
+          SequenceMBBI->getOperand(2).getReg() != RHS ||
+          SequenceMBBI->getOperand(3).getImm() != CC ||
+          SelectDests.count(SequenceMBBI->getOperand(4).getReg()) ||
+          SelectDests.count(SequenceMBBI->getOperand(5).getReg()))
+        break;
+      LastSelectPseudo = &*SequenceMBBI;
+      SequenceMBBI->collectDebugValues(SelectDebugValues);
+      SelectDests.insert(SequenceMBBI->getOperand(0).getReg());
+    } else {
+      if (SequenceMBBI->hasUnmodeledSideEffects() ||
+          SequenceMBBI->mayLoadOrStore())
+        break;
+      if (llvm::any_of(SequenceMBBI->operands(), [&](MachineOperand &MO) {
+            return MO.isReg() && MO.isUse() && SelectDests.count(MO.getReg());
+          }))
+        break;
+    }
+  }
+
+  const TOYRISCVInstrInfo &TII = *Subtarget.getInstrInfo();
+  const BasicBlock *LLVM_BB = BB->getBasicBlock();
+  DebugLoc DL = MI.getDebugLoc();
+  MachineFunction::iterator I = ++BB->getIterator();
+
+  MachineBasicBlock *HeadMBB = BB;
+  MachineFunction *F = BB->getParent();
+  MachineBasicBlock *TailMBB = F->CreateMachineBasicBlock(LLVM_BB);
+  MachineBasicBlock *IfFalseMBB = F->CreateMachineBasicBlock(LLVM_BB);
+
+  F->insert(I, IfFalseMBB);
+  F->insert(I, TailMBB);
+
+  // Transfer debug instructions associated with the selects to TailMBB.
+  for (MachineInstr *DebugInstr : SelectDebugValues) {
+    TailMBB->push_back(DebugInstr->removeFromParent());
+  }
+
+  // Move all instructions after the sequence to TailMBB.
+  TailMBB->splice(TailMBB->end(), HeadMBB,
+                  std::next(LastSelectPseudo->getIterator()), HeadMBB->end());
+  // Update machine-CFG edges by transferring all successors of the current
+  // block to the new block which will contain the Phi nodes for the selects.
+  TailMBB->transferSuccessorsAndUpdatePHIs(HeadMBB);
+  // Set the successors for HeadMBB.
+  HeadMBB->addSuccessor(IfFalseMBB);
+  HeadMBB->addSuccessor(TailMBB);
+
+  // Insert appropriate branch.
+  BuildMI(HeadMBB, DL, TII.getBrCond(CC))
+    .addReg(LHS)
+    .addReg(RHS)
+    .addMBB(TailMBB);
+
+  // IfFalseMBB just falls through to TailMBB.
+  IfFalseMBB->addSuccessor(TailMBB);
+
+  // Create PHIs for all of the select pseudo-instructions.
+  auto SelectMBBI = MI.getIterator();
+  auto SelectEnd = std::next(LastSelectPseudo->getIterator());
+  auto InsertionPoint = TailMBB->begin();
+  while (SelectMBBI != SelectEnd) {
+    auto Next = std::next(SelectMBBI);
+    if (isSelectPseudo(*SelectMBBI)) {
+      // %Result = phi [ %TrueValue, HeadMBB ], [ %FalseValue, IfFalseMBB ]
+      BuildMI(*TailMBB, InsertionPoint, SelectMBBI->getDebugLoc(),
+              TII.get(TOYRISCV::PHI), SelectMBBI->getOperand(0).getReg())
+          .addReg(SelectMBBI->getOperand(4).getReg())
+          .addMBB(HeadMBB)
+          .addReg(SelectMBBI->getOperand(5).getReg())
+          .addMBB(IfFalseMBB);
+      SelectMBBI->eraseFromParent();
+    }
+    SelectMBBI = Next;
+  }
+
+  F->getProperties().reset(MachineFunctionProperties::Property::NoPHIs);
+  return TailMBB;
+}
+
+MachineBasicBlock *
+TOYRISCVTargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
+                                                 MachineBasicBlock *BB) const {
+  switch (MI.getOpcode()) {
+  default:
+    llvm_unreachable("Unexpected instr type to insert");
+  case TOYRISCV::Select_GPR_Using_CC_GPR:
+    return emitSelectPseudo(MI, BB, Subtarget);
   }
 }
 
