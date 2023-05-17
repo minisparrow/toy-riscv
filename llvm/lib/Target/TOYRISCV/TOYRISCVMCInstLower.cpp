@@ -88,6 +88,9 @@ void llvm::LowerTOYRISCVMachineInstrToMCInst(const MachineInstr *MI,
     case MachineOperand::MO_MachineBasicBlock:
       MCOp = MCOperand::createExpr(MCSymbolRefExpr::create(MO.getMBB()->getSymbol(), AP.OutContext));
       break;
+    case MachineOperand::MO_GlobalAddress:
+      MCOp = lowerSymbolOperand(MO, AP.getSymbolPreferLocal(*MO.getGlobal()), AP);
+      break;
     }
     OutMI.addOperand(MCOp);
   }
